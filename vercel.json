@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    { "src": "/api/info", "dest": "/api/info.py" },
+    { "src": "/api/download", "dest": "/api/download.py" },
+    { "src": "/api/status/(.*)", "dest": "/api/status/[job_id].py" },
+    { "src": "/api/file/(.*)", "dest": "/api/file/[job_id].py" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ],
+  "functions": {
+    "api/**/*.py": {
+      "maxDuration": 60
+    }
+  }
+}

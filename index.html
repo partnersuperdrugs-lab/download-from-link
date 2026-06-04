@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VortexDL — Video Downloader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0a0a0f;
+    --surface: #111118;
+    --border:  #1e1e2e;
+    --accent:  #00f5a0;
+    --accent2: #00d9f5;
+    --warn:    #f5a000;
+    --danger:  #f5003c;
+    --text:    #e8e8f0;
+    --muted:   #6b6b80;
+    --radius:  14px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(0,245,160,.07) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 80% 80%, rgba(0,217,245,.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 60% at 60% 40%, rgba(245,0,60,.04) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .wrap {
+    position: relative; z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* ── HEADER ── */
+  header { padding: 52px 0 44px; text-align: center; }
+
+  .logo {
+    display: inline-flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  }
+  .logo-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 11px; display: grid; place-items: center; font-size: 22px;
+  }
+  .logo-text {
+    font-family: 'Syne', sans-serif; font-size: 1.75rem; font-weight: 800;
+    letter-spacing: -.03em; color: #fff;
+  }
+  .logo-text span { color: var(--accent); }
+  header p { color: var(--muted); font-size: .82rem; letter-spacing: .09em; text-transform: uppercase; }
+
+  /* Platform badges */
+  .platforms {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 22px;
+  }
+  .plat-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 14px;
+    font-size: .75rem; color: var(--muted);
+    transition: all .2s; cursor: default;
+  }
+  .plat-badge:hover { border-color: var(--accent); color: var(--text); }
+  .plat-badge.special {
+    border-color: rgba(0,245,160,.3);
+    color: var(--accent);
+    background: rgba(0,245,160,.05);
+  }
+  .plat-badge .plat-icon { font-size: .9rem; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 16px;
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+    opacity: .5;
+  }
+
+  /* ── PLATFORM PILL (auto-detected) ── */
+  .platform-pill {
+    display: none; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 8px; margin-bottom: 16px;
+    font-size: .8rem; font-weight: 500;
+    border: 1px solid transparent;
+    animation: fadeUp .25s ease;
+  }
+  .platform-pill.visible { display: flex; }
+  .platform-pill.tiktok    { background: rgba(255,0,80,.08);   border-color: rgba(255,0,80,.25);   color: #ff5c8a; }
+  .platform-pill.instagram { background: rgba(200,50,255,.08); border-color: rgba(200,50,255,.25); color: #d070ff; }
+  .platform-pill.yt_shorts { background: rgba(255,50,50,.08);  border-color: rgba(255,50,50,.25);  color: #ff6060; }
+  .platform-pill.youtube   { background: rgba(255,50,50,.08);  border-color: rgba(255,50,50,.25);  color: #ff6060; }
+  .platform-pill.generic   { background: rgba(0,217,245,.06);  border-color: rgba(0,217,245,.2);   color: var(--accent2); }
+
+  .nowm-badge {
+    margin-left: auto;
+    background: rgba(0,245,160,.12);
+    border: 1px solid rgba(0,245,160,.3);
+    color: var(--accent);
+    border-radius: 6px; padding: 2px 8px; font-size: .7rem;
+    white-space: nowrap;
+  }
+
+  /* ── URL INPUT ── */
+  .input-group { display: flex; gap: 10px; align-items: stretch; }
+
+  .url-input {
+    flex: 1;
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: .9rem;
+    outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  .url-input::placeholder { color: var(--muted); }
+  .url-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,245,160,.08); }
+
+  .btn {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: .88rem;
+    letter-spacing: .04em; border: none; border-radius: 10px;
+    padding: 14px 22px; cursor: pointer; transition: all .2s; white-space: nowrap;
+  }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #00c580); color: #0a0a0f; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,245,160,.3); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* ── OPTIONS ── */
+  .options-row { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+
+  .select-wrap { flex: 1; min-width: 140px; }
+  .select-wrap label {
+    display: block; font-size: .7rem; color: var(--muted);
+    letter-spacing: .09em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  select {
+    width: 100%; background: rgba(255,255,255,.04); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: .85rem;
+    outline: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6b80' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    cursor: pointer; transition: border-color .2s;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* ── FEATURE TAGS (shown per platform) ── */
+  .feature-tags {
+    display: none; flex-wrap: wrap; gap: 6px; margin-top: 12px;
+  }
+  .feature-tags.visible { display: flex; }
+  .ftag {
+    background: rgba(0,245,160,.08); border: 1px solid rgba(0,245,160,.2);
+    color: var(--accent); border-radius: 6px; padding: 3px 10px; font-size: .72rem;
+  }
+  .ftag.blue { background: rgba(0,217,245,.08); border-color: rgba(0,217,245,.2); color: var(--accent2); }
+
+  /* ── VIDEO PREVIEW ── */
+  .preview { display: none; gap: 20px; align-items: flex-start; animation: fadeUp .3s ease; margin-top: 22px; }
+  .preview.visible { display: flex; }
+
+  .thumb-wrap {
+    flex-shrink: 0; width: 168px; height: 95px;
+    border-radius: 8px; overflow: hidden; background: var(--border); position: relative;
+  }
+  .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .duration-badge {
+    position: absolute; bottom: 5px; right: 6px;
+    background: rgba(0,0,0,.8); border-radius: 4px; padding: 2px 6px;
+    font-size: .68rem; color: #fff;
+  }
+  .hd-badge {
+    position: absolute; top: 5px; left: 6px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 4px; padding: 1px 6px; font-size: .65rem;
+    color: #0a0a0f; font-weight: 700; font-family: 'Syne', sans-serif;
+  }
+
+  .preview-info { flex: 1; min-width: 0; }
+  .preview-title {
+    font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+    line-height: 1.35; margin-bottom: 7px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .preview-meta { font-size: .76rem; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+  .preview-meta span { display: flex; align-items: center; gap: 6px; }
+  .res-tag {
+    background: rgba(0,245,160,.1); color: var(--accent);
+    border-radius: 4px; padding: 1px 6px; font-size: .68rem; font-weight: 600;
+  }
+
+  .btn-download {
+    background: linear-gradient(135deg, var(--accent2), #0099cc);
+    color: #0a0a0f; width: 100%; padding: 15px;
+    font-size: .95rem; border-radius: 10px; margin-top: 16px;
+  }
+  .btn-download:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(0,217,245,.3); }
+  .btn-download:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  /* ── STATUS ── */
+  .status-box { display:none; padding:20px; border-radius:10px; text-align:center; animation:fadeUp .3s ease; margin-top:18px; }
+  .status-box.visible { display:block; }
+  .status-box.loading { background:rgba(0,245,160,.05); border:1px solid rgba(0,245,160,.15); }
+  .status-box.error   { background:rgba(245,0,60,.05);  border:1px solid rgba(245,0,60,.2); }
+  .status-box.success { background:rgba(0,217,245,.05); border:1px solid rgba(0,217,245,.2); }
+
+  .spinner {
+    width:34px; height:34px;
+    border:3px solid rgba(0,245,160,.2); border-top-color:var(--accent);
+    border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 12px;
+  }
+  .status-text { font-size:.86rem; color:var(--muted); }
+  .status-text strong { color:var(--text); display:block; margin-bottom:4px; font-family:'Syne',sans-serif; }
+
+  .progress-track { height:3px; background:rgba(255,255,255,.06); border-radius:99px; margin-top:14px; overflow:hidden; }
+  .progress-bar {
+    height:100%; background:linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius:99px; width:0%; transition:width .3s ease;
+  }
+
+  /* ── INFO STRIP ── */
+  .info-strip {
+    display:flex; gap:14px; flex-wrap:wrap;
+    padding:18px 0; border-top:1px solid var(--border); margin-top:6px;
+  }
+  .info-item { display:flex; align-items:center; gap:7px; font-size:.76rem; color:var(--muted); }
+  .info-item .dot { width:5px; height:5px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+
+  /* ── HOW IT WORKS ── */
+  .how-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); padding:24px 28px; margin-bottom:16px;
+  }
+  .how-card h3 {
+    font-family:'Syne',sans-serif; font-size:.85rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:18px;
+  }
+  .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; }
+  .step { display:flex; flex-direction:column; gap:6px; }
+  .step-num {
+    width:28px; height:28px; border-radius:8px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#0a0a0f; font-family:'Syne',sans-serif; font-weight:800; font-size:.85rem;
+    display:grid; place-items:center;
+  }
+  .step-title { font-family:'Syne',sans-serif; font-size:.85rem; font-weight:700; }
+  .step-desc { font-size:.75rem; color:var(--muted); line-height:1.5; }
+
+  /* ── FOOTER ── */
+  footer { text-align:center; color:var(--muted); font-size:.73rem; padding-top:20px; border-top:1px solid var(--border); line-height:1.9; }
+  footer a { color:var(--accent); text-decoration:none; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes spin    { to { transform:rotate(360deg); } }
+  @keyframes fadeUp  { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  @media (max-width:580px) {
+    .input-group { flex-direction:column; }
+    .preview { flex-direction:column; }
+    .thumb-wrap { width:100%; height:170px; }
+    header { padding:36px 0 28px; }
+    .card { padding:18px 20px; }
+    .steps { grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⬇</div>
+      <div class="logo-text">Vortex<span>DL</span></div>
+    </div>
+    <p>HD Video Downloader · No Watermark · 1000+ Sites</p>
+
+    <div class="platforms">
+      <span class="plat-badge special"><span class="plat-icon">🎵</span> TikTok HD · No WM</span>
+      <span class="plat-badge special"><span class="plat-icon">📸</span> Instagram HD · No WM</span>
+      <span class="plat-badge special"><span class="plat-icon">▶️</span> YT Shorts HD</span>
+      <span class="plat-badge"><span class="plat-icon">🎬</span> YouTube</span>
+      <span class="plat-badge"><span class="plat-icon">🐦</span> Twitter / X</span>
+      <span class="plat-badge"><span class="plat-icon">📘</span> Facebook</span>
+      <span class="plat-badge"><span class="plat-icon">🎞</span> Vimeo</span>
+      <span class="plat-badge"><span class="plat-icon">🤖</span> Reddit</span>
+      <span class="plat-badge">+ 1000 more</span>
+    </div>
+  </header>
+
+  <!-- MAIN CARD -->
+  <div class="card">
+
+    <!-- Auto-detected platform pill -->
+    <div class="platform-pill" id="platformPill"></div>
+
+    <!-- URL Input -->
+    <div class="input-group">
+      <input type="url" id="urlInput" class="url-input"
+        placeholder="Paste any video URL — TikTok, Instagram, YouTube, Twitter…"
+        autocomplete="off" spellcheck="false" />
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchInfo()">Inspect</button>
+    </div>
+
+    <!-- Feature tags (shown per platform) -->
+    <div class="feature-tags" id="featureTags"></div>
+
+    <!-- Options -->
+    <div class="options-row">
+      <div class="select-wrap">
+        <label>Quality</label>
+        <select id="qualitySelect">
+          <option value="best">Best Available</option>
+          <option value="1080">1080p Full HD</option>
+          <option value="720">720p HD</option>
+          <option value="480">480p</option>
+        </select>
+      </div>
+      <div class="select-wrap">
+        <label>Format</label>
+        <select id="formatSelect">
+          <option value="mp4">MP4 (Video)</option>
+          <option value="mp3">MP3 (Audio Only)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Video Preview -->
+    <div class="preview" id="preview">
+      <div class="thumb-wrap">
+        <img id="thumbImg" src="" alt="thumbnail" />
+        <span class="duration-badge" id="durationBadge"></span>
+        <span class="hd-badge" id="hdBadge" style="display:none">HD</span>
+      </div>
+      <div class="preview-info">
+        <div class="preview-title" id="previewTitle"></div>
+        <div class="preview-meta">
+          <span>🎬 <span id="previewUploader"></span></span>
+          <span>👁 <span id="previewViews"></span></span>
+          <span>❤️ <span id="previewLikes"></span></span>
+          <span>📐 Max: <span id="previewRes" class="res-tag"></span></span>
+          <span>🌐 <span id="previewSite"></span></span>
+        </div>
+        <button class="btn btn-download" id="downloadBtn" onclick="startDownload()">
+          ⬇ Download Now
+        </button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-box" id="statusBox"></div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how-card">
+    <h3>How it works</h3>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-title">Paste URL</div>
+        <div class="step-desc">Copy any video link and paste it in the box above</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-title">Inspect</div>
+        <div class="step-desc">Preview the video — title, thumbnail & max resolution</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-title">Choose quality</div>
+        <div class="step-desc">Pick Full HD, 720p, or audio-only MP3</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-title">Download</div>
+        <div class="step-desc">File saved directly to your device — no watermark</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFO STRIP -->
+  <div class="info-strip">
+    <div class="info-item"><span class="dot"></span> TikTok: no watermark</div>
+    <div class="info-item"><span class="dot"></span> Instagram: no watermark</div>
+    <div class="info-item"><span class="dot"></span> YT Shorts: Full HD</div>
+    <div class="info-item"><span class="dot"></span> MP3 extraction</div>
+    <div class="info-item"><span class="dot"></span> No account needed</div>
+    <div class="info-item"><span class="dot"></span> Self-hosted & private</div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer style="margin-top:30px;">
+    <p>Powered by <a href="https://github.com/yt-dlp/yt-dlp" target="_blank">yt-dlp</a> — open-source video extractor supporting 1000+ sites.</p>
+    <p>Use responsibly. Respect copyright law and each platform's terms of service.</p>
+  </footer>
+
+</div><!-- /wrap -->
+
+<script>
+const API = 'http://localhost:5000'; // ← change to your server URL if deployed
+
+let currentJobId = null;
+let pollTimer    = null;
+
+// ── PLATFORM CONFIG ───────────────────────────────────────────────────
+const PLATFORM_CONFIG = {
+  tiktok: {
+    label: '🎵 TikTok detected',
+    cls: 'tiktok',
+    features: ['No Watermark', 'Full HD 1080p', 'Original Quality'],
+    featureCls: ['', '', ''],
+  },
+  instagram: {
+    label: '📸 Instagram detected',
+    cls: 'instagram',
+    features: ['No Watermark', 'Full HD', 'Reel / Post / Story'],
+    featureCls: ['', '', 'blue'],
+  },
+  yt_shorts: {
+    label: '▶️ YouTube Shorts detected',
+    cls: 'yt_shorts',
+    features: ['Full HD 1080p', 'No Ads', 'Fast Download'],
+    featureCls: ['', 'blue', 'blue'],
+  },
+  youtube: {
+    label: '🎬 YouTube detected',
+    cls: 'youtube',
+    features: ['Up to 4K', 'MP3 Audio', 'Fast Download'],
+    featureCls: ['', 'blue', 'blue'],
+  },
+  generic: {
+    label: '🌐 Platform detected',
+    cls: 'generic',
+    features: ['Best Available Quality', 'MP3 Extraction'],
+    featureCls: ['blue', 'blue'],
+  },
+};
+
+function detectPlatform(url) {
+  const u = url.toLowerCase();
+  if (u.includes('tiktok.com') || u.includes('vm.tiktok') || u.includes('vt.tiktok')) return 'tiktok';
+  if (u.includes('instagram.com') || u.includes('instagr.am')) return 'instagram';
+  if ((u.includes('youtube.com') && u.includes('shorts')) || u.includes('youtu.be')) return 'yt_shorts';
+  if (u.includes('youtube.com')) return 'youtube';
+  if (u.startsWith('http')) return 'generic';
+  return null;
+}
+
+function updatePlatformUI(platform) {
+  const pill = document.getElementById('platformPill');
+  const tags = document.getElementById('featureTags');
+  const cfg  = PLATFORM_CONFIG[platform];
+
+  if (!cfg) {
+    pill.className = 'platform-pill';
+    tags.className = 'feature-tags';
+    return;
+  }
+
+  pill.className = `platform-pill visible ${cfg.cls}`;
+  pill.innerHTML = `<span>${cfg.label}</span>${
+    (platform === 'tiktok' || platform === 'instagram')
+      ? '<span class="nowm-badge">✨ No Watermark</span>'
+      : ''
+  }`;
+
+  tags.className = 'feature-tags visible';
+  tags.innerHTML = cfg.features.map((f, i) =>
+    `<span class="ftag ${cfg.featureCls[i] || ''}">${f}</span>`
+  ).join('');
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────
+function showStatus(type, html) {
+  const b = document.getElementById('statusBox');
+  b.className = `status-box visible ${type}`;
+  b.innerHTML = html;
+}
+function hideStatus() {
+  const b = document.getElementById('statusBox');
+  b.className = 'status-box'; b.innerHTML = '';
+}
+function fmt(n) {
+  if (!n) return 'N/A';
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+  return n.toString();
+}
+
+// ── LIVE PLATFORM DETECTION ON TYPE ──────────────────────────────────
+document.getElementById('urlInput').addEventListener('input', function() {
+  const p = detectPlatform(this.value.trim());
+  if (p) updatePlatformUI(p);
+  else {
+    document.getElementById('platformPill').className = 'platform-pill';
+    document.getElementById('featureTags').className = 'feature-tags';
+  }
+});
+
+// ── STEP 1: FETCH INFO ────────────────────────────────────────────────
+async function fetchInfo() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) { alert('Please paste a video URL first.'); return; }
+
+  document.getElementById('preview').classList.remove('visible');
+  document.getElementById('fetchBtn').disabled = true;
+
+  showStatus('loading', `
+    <div class="spinner"></div>
+    <div class="status-text"><strong>Fetching video info…</strong>Detecting platform & extracting metadata</div>
+    <div class="progress-track"><div class="progress-bar" style="width:35%"></div></div>
+  `);
+
+  try {
+    const res  = await fetch(`${API}/api/info`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showStatus('error', `<div style="font-size:1.5rem;margin-bottom:8px">⚠</div>
+        <div class="status-text"><strong>Could not fetch video info</strong>${data.error || 'Unknown error'}</div>`);
+    } else {
+      hideStatus();
+      updatePlatformUI(data.platform || 'generic');
+
+      document.getElementById('thumbImg').src = data.thumbnail || '';
+      document.getElementById('previewTitle').textContent = data.title || 'Untitled';
+      document.getElementById('previewUploader').textContent = data.uploader || 'Unknown';
+      document.getElementById('previewViews').textContent = fmt(data.view_count) + ' views';
+      document.getElementById('previewLikes').textContent = fmt(data.like_count) + ' likes';
+      document.getElementById('previewRes').textContent = data.max_height ? data.max_height + 'p' : '—';
+      document.getElementById('previewSite').textContent = data.website || '—';
+      document.getElementById('durationBadge').textContent = data.duration || '';
+
+      // Show HD badge if >= 1080
+      const hdBadge = document.getElementById('hdBadge');
+      hdBadge.style.display = (data.max_height >= 1080) ? '' : 'none';
+
+      document.getElementById('preview').classList.add('visible');
+      document.getElementById('downloadBtn').disabled = false;
+    }
+  } catch (e) {
+    showStatus('error', `<div style="font-size:1.5rem;margin-bottom:8px">🔌</div>
+      <div class="status-text"><strong>Cannot reach server</strong>Make sure app.py is running at ${API}</div>`);
+  }
+  document.getElementById('fetchBtn').disabled = false;
+}
+
+// ── STEP 2: DOWNLOAD ──────────────────────────────────────────────────
+async function startDownload() {
+  const url     = document.getElementById('urlInput').value.trim();
+  const quality = document.getElementById('qualitySelect').value;
+  const format  = document.getElementById('formatSelect').value;
+  const plat    = detectPlatform(url);
+
+  document.getElementById('downloadBtn').disabled = true;
+
+  const platformMsg = plat === 'tiktok'    ? 'Removing TikTok watermark & fetching HD…' :
+                      plat === 'instagram' ? 'Fetching Instagram HD without watermark…'  :
+                      plat === 'yt_shorts' ? 'Fetching YouTube Shorts in Full HD…'       :
+                      'Downloading with yt-dlp…';
+
+  showStatus('loading', `
+    <div class="spinner"></div>
+    <div class="status-text"><strong>Downloading…</strong>${platformMsg}</div>
+    <div class="progress-track"><div class="progress-bar" id="progBar" style="width:8%"></div></div>
+  `);
+
+  let prog = 8;
+  const progTimer = setInterval(() => {
+    prog = Math.min(prog + Math.random() * 4, 88);
+    const b = document.getElementById('progBar');
+    if (b) b.style.width = prog + '%';
+  }, 900);
+
+  try {
+    const res  = await fetch(`${API}/api/download`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url, quality, format })
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      clearInterval(progTimer);
+      showStatus('error', `<div style="font-size:1.5rem;margin-bottom:8px">⚠</div>
+        <div class="status-text"><strong>Download failed</strong>${data.error}</div>`);
+      document.getElementById('downloadBtn').disabled = false;
+      return;
+    }
+
+    currentJobId = data.job_id;
+    pollJob(currentJobId, progTimer);
+
+  } catch (e) {
+    clearInterval(progTimer);
+    showStatus('error', `<div style="font-size:1.5rem;margin-bottom:8px">🔌</div>
+      <div class="status-text"><strong>Cannot reach server</strong>Make sure app.py is running at ${API}</div>`);
+    document.getElementById('downloadBtn').disabled = false;
+  }
+}
+
+// ── STEP 3: POLL ──────────────────────────────────────────────────────
+function pollJob(jobId, progTimer) {
+  if (pollTimer) clearInterval(pollTimer);
+
+  pollTimer = setInterval(async () => {
+    try {
+      const res  = await fetch(`${API}/api/status/${jobId}`);
+      const data = await res.json();
+
+      if (data.status === 'done') {
+        clearInterval(pollTimer);
+        clearInterval(progTimer);
+        const bar = document.getElementById('progBar');
+        if (bar) bar.style.width = '100%';
+
+        setTimeout(() => {
+          window.location.href = `${API}/api/file/${jobId}`;
+          showStatus('success', `
+            <div style="font-size:1.9rem;margin-bottom:10px">✅</div>
+            <div class="status-text"><strong>Download started!</strong>
+            Your file is saving to your device.</div>
+          `);
+          document.getElementById('downloadBtn').disabled = false;
+        }, 350);
+
+      } else if (data.status === 'error') {
+        clearInterval(pollTimer);
+        clearInterval(progTimer);
+        showStatus('error', `<div style="font-size:1.5rem;margin-bottom:8px">⚠</div>
+          <div class="status-text"><strong>Download failed</strong>${data.error || 'Unknown error'}</div>`);
+        document.getElementById('downloadBtn').disabled = false;
+      }
+    } catch (_) { /* network blip, keep polling */ }
+  }, 1500);
+}
+
+// ── KEYBOARD & PASTE ──────────────────────────────────────────────────
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') fetchInfo();
+});
+document.getElementById('urlInput').addEventListener('paste', () => {
+  setTimeout(() => {
+    const v = document.getElementById('urlInput').value.trim();
+    if (v.startsWith('http')) fetchInfo();
+  }, 100);
+});
+</script>
+</body>
+</html>
