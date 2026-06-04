@@ -3,7 +3,10 @@
   "builds": [
     {
       "src": "api/**/*.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxDuration": 60
+      }
     }
   ],
   "routes": [
@@ -12,10 +15,5 @@
     { "src": "/api/status/(.*)", "dest": "/api/status/[job_id].py" },
     { "src": "/api/file/(.*)", "dest": "/api/file/[job_id].py" },
     { "src": "/(.*)", "dest": "/index.html" }
-  ],
-  "functions": {
-    "api/**/*.py": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
